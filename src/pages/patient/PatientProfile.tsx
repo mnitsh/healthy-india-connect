@@ -30,11 +30,18 @@ const PatientProfile = () => {
 
   const userToken = localStorage.getItem('userToken');
 
+  // Helper function for handling auth errors
+  const handleAuthError = (message: string) => {
+    localStorage.removeItem('userToken');
+    localStorage.removeItem('userRole');
+    toast.error(message || "Session expired or unauthorized. Please log in again.");
+    navigate('/patient/login');
+  }
+
   // --- Data Fetching Effect ---
   useEffect(() => {
     if (!userToken) {
-      toast.error("Please log in to view your profile.");
-      navigate('/patient/login');
+      handleAuthError("Please log in to view your profile.");
       return;
     }
 
@@ -47,6 +54,10 @@ const PatientProfile = () => {
             'Authorization': `Bearer ${userToken}`,
           },
         });
+
+        if (response.status === 401 || response.status === 403) {
+            return handleAuthError(response.statusText);
+        }
 
         const data = await response.json();
 
@@ -95,12 +106,17 @@ const PatientProfile = () => {
         body: JSON.stringify({
           name: formData.name,
           phone: formData.phone,
-          age: formData.age,
-          weight: formData.weight,
-          height: formData.height,
+          // Convert string inputs back to numbers if needed, or rely on backend to handle
+          age: parseInt(formData.age as string) || null,
+          weight: parseFloat(formData.weight as string) || null,
+          height: parseFloat(formData.height as string) || null,
         }),
       });
 
+      if (response.status === 401 || response.status === 403) {
+          return handleAuthError(response.statusText);
+      }
+      
       const data = await response.json();
 
       if (response.ok) {

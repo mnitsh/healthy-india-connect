@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,70 +6,122 @@ import { Progress } from "@/components/ui/progress";
 import { Heart, Droplets, Flame, Moon, User, LogOut, Stethoscope } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+
+interface TodayStats {
+  waterIntake: number;
+  waterGoal: number;
+  calories: number;
+  caloriesGoal: number;
+  sleep: number;
+  sleepGoal: number;
+}
+
+interface WeeklyDataPoint {
+  day: string;
+  water: number;
+  calories: number;
+  hours: number;
+}
+
+interface Recommendation {
+  doctorName: string;
+  date: string;
+  recommendation: string;
+  priority: 'high' | 'medium' | 'low';
+}
+
+interface DashboardData {
+  todayStats: TodayStats;
+  weeklyData: WeeklyDataPoint[];
+  doctorRecommendations: Recommendation[];
+}
 
 const PatientDashboard = () => {
   const navigate = useNavigate();
-  const [waterIntake] = useState(6);
-  const [calories] = useState(1850);
-  const [sleep] = useState(7.5);
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const weeklyWaterData = [
-    { day: "Mon", glasses: 7 },
-    { day: "Tue", glasses: 6 },
-    { day: "Wed", glasses: 8 },
-    { day: "Thu", glasses: 5 },
-    { day: "Fri", glasses: 7 },
-    { day: "Sat", glasses: 8 },
-    { day: "Sun", glasses: 6 },
-  ];
+  const userToken = localStorage.getItem('userToken');
 
-  const weeklyCaloriesData = [
-    { day: "Mon", calories: 2100 },
-    { day: "Tue", calories: 1950 },
-    { day: "Wed", calories: 1800 },
-    { day: "Thu", calories: 2200 },
-    { day: "Fri", calories: 1900 },
-    { day: "Sat", calories: 2000 },
-    { day: "Sun", calories: 1850 },
-  ];
+  // Helper function for handling auth errors
+  const handleAuthError = (message: string) => {
+    localStorage.removeItem('userToken');
+    localStorage.removeItem('userRole');
+    toast.error(message || "Session expired or unauthorized. Please log in again.");
+    navigate('/patient/login');
+  }
 
-  const weeklySleepData = [
-    { day: "Mon", hours: 7 },
-    { day: "Tue", hours: 6.5 },
-    { day: "Wed", hours: 8 },
-    { day: "Thu", hours: 6 },
-    { day: "Fri", hours: 7.5 },
-    { day: "Sat", hours: 8.5 },
-    { day: "Sun", hours: 7.5 },
-  ];
+  // --- Data Fetching Effect ---
+  useEffect(() => {
+    if (!userToken) {
+        handleAuthError("Please log in to view your dashboard.");
+        return;
+    }
 
-  const doctorRecommendations = [
-    {
-      id: 1,
-      doctorName: "Dr. Sharma",
-      date: "2024-11-20",
-      recommendation: "Increase water intake to 10 glasses per day. Stay hydrated, especially during physical activities.",
-      priority: "high",
-    },
-    {
-      id: 2,
-      doctorName: "Dr. Patel",
-      date: "2024-11-18",
-      recommendation: "Aim for 8 hours of sleep daily. Maintain a consistent sleep schedule for better recovery.",
-      priority: "medium",
-    },
-    {
-      id: 3,
-      doctorName: "Dr. Sharma",
-      date: "2024-11-15",
-      recommendation: "Add 30 minutes of light exercise daily. Walking or yoga would be beneficial for your health goals.",
-      priority: "medium",
-    },
-  ];
+    const fetchDashboardData = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/dashboard/patient', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${userToken}`,
+          },
+        });
+        
+        if (response.status === 401 || response.status === 403) {
+            return handleAuthError(response.statusText);
+        }
+
+        const result = await response.json();
+
+        if (response.ok) {
+          setData(result);
+        } else {
+          toast.error(result.message || "Failed to load dashboard data.");
+        }
+      } catch (error) {
+        console.error("Dashboard Fetch Error:", error);
+        toast.error("Network error fetching dashboard data.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [userToken, navigate]);
 
   const handleLogout = () => {
+    localStorage.removeItem('userToken');
+    localStorage.removeItem('userRole');
     navigate("/patient/login");
   };
+  
+  if (isLoading) {
+    return (
+        <div className="min-h-screen flex items-center justify-center">
+            <p className="text-xl text-muted-foreground">Loading dashboard...</p>
+        </div>
+    );
+  }
+
+  if (!data) {
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-4">
+            <p className="text-xl text-destructive mb-4">Could not load dashboard data.</p>
+            <Button onClick={handleLogout}>Go to Login</Button>
+        </div>
+    );
+  }
+
+  const { todayStats, weeklyData, doctorRecommendations } = data;
+  
+  // Destructure for easier access
+  const { waterIntake, waterGoal, calories, caloriesGoal, sleep, sleepGoal } = todayStats;
+  
+  const waterProgress = (waterIntake / waterGoal) * 100;
+  const caloriesProgress = (calories / caloriesGoal) * 100;
+  const sleepProgress = (sleep / sleepGoal) * 100;
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -100,7 +152,7 @@ const PatientDashboard = () => {
           <p className="text-muted-foreground">Here's your health summary for today</p>
         </div>
 
-        {/* Today's Stats */}
+        {/* Today's Stats (Dynamic) */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           <Card className="border-0 shadow-md hover:shadow-lg transition-all">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -108,9 +160,9 @@ const PatientDashboard = () => {
               <Droplets className="h-5 w-5 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">{waterIntake}/8</div>
+              <div className="text-3xl font-bold text-primary">{waterIntake}/{waterGoal}</div>
               <p className="text-xs text-muted-foreground mt-1">glasses today</p>
-              <Progress value={(waterIntake / 8) * 100} className="mt-3" />
+              <Progress value={waterProgress} className="mt-3" />
             </CardContent>
           </Card>
 
@@ -121,8 +173,8 @@ const PatientDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-accent">{calories}</div>
-              <p className="text-xs text-muted-foreground mt-1">of 2000 kcal goal</p>
-              <Progress value={(calories / 2000) * 100} className="mt-3" />
+              <p className="text-xs text-muted-foreground mt-1">of {caloriesGoal} kcal goal</p>
+              <Progress value={caloriesProgress} className="mt-3" />
             </CardContent>
           </Card>
 
@@ -133,13 +185,13 @@ const PatientDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-success">{sleep}h</div>
-              <p className="text-xs text-muted-foreground mt-1">last night</p>
-              <Progress value={(sleep / 8) * 100} className="mt-3" />
+              <p className="text-xs text-muted-foreground mt-1">of {sleepGoal}h goal</p>
+              <Progress value={sleepProgress} className="mt-3" />
             </CardContent>
           </Card>
         </div>
 
-        {/* Weekly Analytics */}
+        {/* Weekly Analytics (Dynamic) */}
         <div className="grid md:grid-cols-2 gap-6">
           <Card className="border-0 shadow-md">
             <CardHeader>
@@ -148,7 +200,7 @@ const PatientDashboard = () => {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={weeklyWaterData}>
+                <LineChart data={weeklyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" />
                   <YAxis stroke="hsl(var(--muted-foreground))" />
@@ -161,7 +213,7 @@ const PatientDashboard = () => {
                   />
                   <Line
                     type="monotone"
-                    dataKey="glasses"
+                    dataKey="water"
                     stroke="hsl(var(--primary))"
                     strokeWidth={2}
                     dot={{ fill: "hsl(var(--primary))" }}
@@ -178,7 +230,7 @@ const PatientDashboard = () => {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={weeklyCaloriesData}>
+                <BarChart data={weeklyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" />
                   <YAxis stroke="hsl(var(--muted-foreground))" />
@@ -202,7 +254,7 @@ const PatientDashboard = () => {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={weeklySleepData}>
+                <LineChart data={weeklyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" />
                   <YAxis stroke="hsl(var(--muted-foreground))" domain={[0, 10]} />
@@ -226,37 +278,41 @@ const PatientDashboard = () => {
           </Card>
         </div>
 
-        {/* Doctor Recommendations */}
+        {/* Doctor Recommendations (Dynamic) */}
         <div className="mt-8">
           <h3 className="text-2xl font-bold mb-4">Doctor Recommendations</h3>
           <div className="space-y-4">
-            {doctorRecommendations.map((rec) => (
-              <Card key={rec.id} className="border-0 shadow-md hover:shadow-lg transition-all">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <Stethoscope className="h-5 w-5 text-primary" />
-                      <div>
-                        <CardTitle className="text-lg">{rec.doctorName}</CardTitle>
-                        <CardDescription className="text-xs">
-                          {new Date(rec.date).toLocaleDateString("en-IN", {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          })}
-                        </CardDescription>
-                      </div>
-                    </div>
-                    <Badge variant={rec.priority === "high" ? "default" : "secondary"}>
-                      {rec.priority === "high" ? "High Priority" : "Medium Priority"}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-foreground">{rec.recommendation}</p>
-                </CardContent>
-              </Card>
-            ))}
+            {doctorRecommendations.length > 0 ? (
+                doctorRecommendations.map((rec, index) => (
+                    <Card key={index} className="border-0 shadow-md hover:shadow-lg transition-all">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2">
+                            <Stethoscope className="h-5 w-5 text-primary" />
+                            <div>
+                              <CardTitle className="text-lg">{rec.doctorName}</CardTitle>
+                              <CardDescription className="text-xs">
+                                {new Date(rec.date).toLocaleDateString("en-IN", {
+                                  year: "numeric",
+                                  month: "long",
+                                  day: "numeric",
+                                })}
+                              </CardDescription>
+                            </div>
+                          </div>
+                          <Badge variant={rec.priority === "high" ? "default" : "secondary"}>
+                            {rec.priority === "high" ? "High Priority" : rec.priority === "medium" ? "Medium Priority" : "Low Priority"}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-foreground">{rec.recommendation}</p>
+                      </CardContent>
+                    </Card>
+                ))
+            ) : (
+                <p className="text-muted-foreground">No recent recommendations from your doctor.</p>
+            )}
           </div>
         </div>
       </main>

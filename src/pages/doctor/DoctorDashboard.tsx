@@ -1,20 +1,102 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Stethoscope, Users, Calendar, Activity, User, LogOut } from "lucide-react";
+import { toast } from "sonner";
+
+interface RecentPatient {
+    name: string;
+    lastVisit: string;
+    condition: string;
+}
+
+interface DoctorDashboardData {
+    totalPatients: number;
+    todayAppointments: number;
+    activeCases: number;
+    totalConsultations: number;
+    recentPatients: RecentPatient[];
+}
 
 const DoctorDashboard = () => {
   const navigate = useNavigate();
+  const [data, setData] = useState<DoctorDashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const recentPatients = [
-    { name: "John Doe", lastVisit: "2024-01-15", condition: "Follow-up" },
-    { name: "Jane Smith", lastVisit: "2024-01-14", condition: "Consultation" },
-    { name: "Mike Johnson", lastVisit: "2024-01-14", condition: "Check-up" },
-  ];
+  const userToken = localStorage.getItem('userToken');
+
+  // Helper function for handling auth errors
+  const handleAuthError = (message: string) => {
+    localStorage.removeItem('userToken');
+    localStorage.removeItem('userRole');
+    toast.error(message || "Session expired or unauthorized. Please log in again.");
+    navigate('/doctor/login');
+  }
+
+  // --- Data Fetching Effect ---
+  useEffect(() => {
+    if (!userToken) {
+        handleAuthError("Please log in to view your dashboard.");
+        return;
+    }
+
+    const fetchDashboardData = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/dashboard/doctor', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${userToken}`,
+          },
+        });
+        
+        if (response.status === 401 || response.status === 403) {
+            return handleAuthError(response.statusText);
+        }
+
+        const result = await response.json();
+
+        if (response.ok) {
+          setData(result);
+        } else {
+          toast.error(result.message || "Failed to load dashboard data.");
+        }
+      } catch (error) {
+        console.error("Dashboard Fetch Error:", error);
+        toast.error("Network error fetching dashboard data.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [userToken, navigate]);
+
 
   const handleLogout = () => {
+    localStorage.removeItem('userToken');
+    localStorage.removeItem('userRole');
     navigate("/doctor/login");
   };
+
+  if (isLoading) {
+    return (
+        <div className="min-h-screen flex items-center justify-center">
+            <p className="text-xl text-muted-foreground">Loading dashboard...</p>
+        </div>
+    );
+  }
+
+  if (!data) {
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-4">
+            <p className="text-xl text-destructive mb-4">Could not load dashboard data.</p>
+            <Button onClick={handleLogout}>Go to Login</Button>
+        </div>
+    );
+  }
+
+  const { totalPatients, todayAppointments, activeCases, totalConsultations, recentPatients } = data;
 
   return (
     <div className="min-h-screen bg-background">
@@ -45,7 +127,7 @@ const DoctorDashboard = () => {
           <p className="text-muted-foreground">Overview of your practice</p>
         </div>
 
-        {/* Stats */}
+        {/* Stats (Dynamic) */}
         <div className="grid md:grid-cols-4 gap-6 mb-8">
           <Card className="border-0 shadow-md hover:shadow-lg transition-all">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -53,8 +135,8 @@ const DoctorDashboard = () => {
               <Users className="h-5 w-5 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">247</div>
-              <p className="text-xs text-muted-foreground mt-1">+12 this month</p>
+              <div className="text-3xl font-bold">{totalPatients}</div>
+              <p className="text-xs text-muted-foreground mt-1">Overall</p>
             </CardContent>
           </Card>
 
@@ -64,8 +146,8 @@ const DoctorDashboard = () => {
               <Calendar className="h-5 w-5 text-accent" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">8</div>
-              <p className="text-xs text-muted-foreground mt-1">3 completed</p>
+              <div className="text-3xl font-bold">{todayAppointments}</div>
+              <p className="text-xs text-muted-foreground mt-1">Today</p>
             </CardContent>
           </Card>
 
@@ -75,24 +157,24 @@ const DoctorDashboard = () => {
               <Activity className="h-5 w-5 text-success" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">42</div>
+              <div className="text-3xl font-bold">{activeCases}</div>
               <p className="text-xs text-muted-foreground mt-1">Ongoing treatments</p>
             </CardContent>
           </Card>
 
           <Card className="border-0 shadow-md hover:shadow-lg transition-all">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Consultations</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Consultations</CardTitle>
               <Stethoscope className="h-5 w-5 text-accent" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">156</div>
-              <p className="text-xs text-muted-foreground mt-1">This month</p>
+              <div className="text-3xl font-bold">{totalConsultations}</div>
+              <p className="text-xs text-muted-foreground mt-1">Overall</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Recent Patients */}
+        {/* Recent Patients (Dynamic) */}
         <Card className="border-0 shadow-md">
           <CardHeader>
             <CardTitle>Recent Patients</CardTitle>
@@ -100,26 +182,30 @@ const DoctorDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentPatients.map((patient, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <User className="h-5 w-5 text-primary" />
+              {recentPatients.length > 0 ? (
+                recentPatients.map((patient, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <User className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{patient.name}</p>
+                          <p className="text-sm text-muted-foreground">{patient.condition}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Last visit</p>
+                        <p className="text-sm font-medium">{patient.lastVisit}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">{patient.name}</p>
-                      <p className="text-sm text-muted-foreground">{patient.condition}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Last visit</p>
-                    <p className="text-sm font-medium">{patient.lastVisit}</p>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                  <p className="text-muted-foreground">No recent patient records found.</p>
+              )}
             </div>
           </CardContent>
         </Card>

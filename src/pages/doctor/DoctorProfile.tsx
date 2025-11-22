@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,22 +7,139 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Stethoscope, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
+interface DoctorProfileData {
+  name: string;
+  email: string;
+  phone: string;
+  specialization: string;
+  hospital: string;
+  licenseNumber: string;
+  experience: string | number;
+}
+
 const DoctorProfile = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    name: "Dr. Jane Smith",
-    email: "jane@hospital.com",
-    phone: "+91 98765 43210",
-    specialization: "Cardiology",
-    hospital: "City Hospital",
-    licenseNumber: "MED123456",
-    experience: "15",
+  const [formData, setFormData] = useState<DoctorProfileData>({
+    name: "",
+    email: "",
+    phone: "",
+    specialization: "",
+    hospital: "",
+    licenseNumber: "",
+    experience: "",
   });
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast.success("Profile updated successfully!");
+  const userToken = localStorage.getItem('userToken');
+
+  // Helper function for handling auth errors
+  const handleAuthError = (message: string) => {
+    localStorage.removeItem('userToken');
+    localStorage.removeItem('userRole');
+    toast.error(message || "Session expired or unauthorized. Please log in again.");
+    navigate('/doctor/login');
+  }
+
+  // --- Data Fetching Effect ---
+  useEffect(() => {
+    if (!userToken) {
+      handleAuthError("Please log in to view your profile.");
+      return;
+    }
+
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/profile/provider', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${userToken}`,
+          },
+        });
+
+        if (response.status === 401 || response.status === 403) {
+            return handleAuthError(response.statusText);
+        }
+
+        const data = await response.json();
+
+        if (response.ok) {
+          setFormData({
+            ...data,
+            experience: data.experience?.toString() || '',
+          });
+        } else {
+          toast.error(data.message || "Failed to load profile data.");
+        }
+      } catch (error) {
+        console.error("Fetch Profile Error:", error);
+        toast.error("Network error fetching profile data.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [userToken, navigate]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.id]: e.target.value });
   };
+
+  // --- Form Submission Logic ---
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!userToken) {
+        toast.error("You must be logged in to update your profile.");
+        return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:5000/api/profile/provider', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userToken}`,
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          phone: formData.phone,
+          specialization: formData.specialization,
+          hospital: formData.hospital,
+          licenseNumber: formData.licenseNumber,
+          experience: parseInt(formData.experience as string) || null,
+        }),
+      });
+
+      if (response.status === 401 || response.status === 403) {
+          return handleAuthError(response.statusText);
+      }
+      
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success(data.message || "Profile updated successfully!");
+        setFormData({
+            ...data,
+            experience: data.experience?.toString() || '',
+        });
+      } else {
+        toast.error(data.message || "Profile update failed.");
+      }
+    } catch (error) {
+      console.error("Update Profile Error:", error);
+      toast.error("Network error updating profile.");
+    }
+  };
+
+  if (isLoading) {
+    return (
+        <div className="min-h-screen flex items-center justify-center">
+            <p className="text-xl text-muted-foreground">Loading profile...</p>
+        </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -55,16 +172,17 @@ const DoctorProfile = () => {
                   <Input
                     id="name"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={handleChange}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">Email (Read Only)</Label>
                   <Input
                     id="email"
                     type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    readOnly
+                    className="cursor-not-allowed bg-muted/50"
                   />
                 </div>
               </div>
@@ -75,7 +193,7 @@ const DoctorProfile = () => {
                   <Input
                     id="phone"
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onChange={handleChange}
                   />
                 </div>
                 <div className="space-y-2">
@@ -83,7 +201,7 @@ const DoctorProfile = () => {
                   <Input
                     id="specialization"
                     value={formData.specialization}
-                    onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
+                    onChange={handleChange}
                   />
                 </div>
               </div>
@@ -94,7 +212,7 @@ const DoctorProfile = () => {
                   <Input
                     id="hospital"
                     value={formData.hospital}
-                    onChange={(e) => setFormData({ ...formData, hospital: e.target.value })}
+                    onChange={handleChange}
                   />
                 </div>
                 <div className="space-y-2">
@@ -102,7 +220,7 @@ const DoctorProfile = () => {
                   <Input
                     id="licenseNumber"
                     value={formData.licenseNumber}
-                    onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
+                    onChange={handleChange}
                   />
                 </div>
               </div>
@@ -113,7 +231,7 @@ const DoctorProfile = () => {
                   id="experience"
                   type="number"
                   value={formData.experience}
-                  onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                  onChange={handleChange}
                 />
               </div>
 
