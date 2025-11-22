@@ -6,6 +6,7 @@ import { Stethoscope, Users, Calendar, Activity, User, LogOut } from "lucide-rea
 import { toast } from "sonner";
 
 interface RecentPatient {
+    id: string; // Added ID for navigation
     name: string;
     lastVisit: string;
     condition: string;
@@ -78,6 +79,11 @@ const DoctorDashboard = () => {
     localStorage.removeItem('userRole');
     navigate("/doctor/login");
   };
+  
+  // NEW: Navigation handler to patient detail page
+  const handleViewPatientDetail = (patientId: string) => {
+    navigate(`/doctor/patient/${patientId}`);
+  };
 
   if (isLoading) {
     return (
@@ -136,7 +142,7 @@ const DoctorDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{totalPatients}</div>
-              <p className="text-xs text-muted-foreground mt-1">Overall</p>
+              <p className="text-xs text-muted-foreground mt-1">Assigned to you</p>
             </CardContent>
           </Card>
 
@@ -147,7 +153,7 @@ const DoctorDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{todayAppointments}</div>
-              <p className="text-xs text-muted-foreground mt-1">Today</p>
+              <p className="text-xs text-muted-foreground mt-1">Today (Estimate)</p>
             </CardContent>
           </Card>
 
@@ -158,7 +164,7 @@ const DoctorDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{activeCases}</div>
-              <p className="text-xs text-muted-foreground mt-1">Ongoing treatments</p>
+              <p className="text-xs text-muted-foreground mt-1">Under monitoring</p>
             </CardContent>
           </Card>
 
@@ -169,16 +175,16 @@ const DoctorDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{totalConsultations}</div>
-              <p className="text-xs text-muted-foreground mt-1">Overall</p>
+              <p className="text-xs text-muted-foreground mt-1">Historical</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Recent Patients (Dynamic) */}
+        {/* Recent Patients (Dynamic and Clickable) */}
         <Card className="border-0 shadow-md">
           <CardHeader>
-            <CardTitle>Recent Patients</CardTitle>
-            <CardDescription>Your latest patient interactions</CardDescription>
+            <CardTitle>Assigned Patients</CardTitle>
+            <CardDescription>Click a patient to view their detailed health record</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -186,7 +192,8 @@ const DoctorDashboard = () => {
                 recentPatients.map((patient, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+                      className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => handleViewPatientDetail(patient.id)} 
                     >
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -198,13 +205,13 @@ const DoctorDashboard = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-muted-foreground">Last visit</p>
+                        <p className="text-sm text-muted-foreground">Assigned on</p>
                         <p className="text-sm font-medium">{patient.lastVisit}</p>
                       </div>
                     </div>
                 ))
               ) : (
-                  <p className="text-muted-foreground">No recent patient records found.</p>
+                  <p className="text-muted-foreground">No patients have booked you yet.</p>
               )}
             </div>
           </CardContent>
