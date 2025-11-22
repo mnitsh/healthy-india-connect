@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Heart, Droplets, Flame, Moon, User, LogOut } from "lucide-react";
+import { Heart, Droplets, Flame, Moon, User, LogOut, Stethoscope } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
+import { Badge } from "@/components/ui/badge";
 
 const PatientDashboard = () => {
   const navigate = useNavigate();
@@ -40,6 +41,30 @@ const PatientDashboard = () => {
     { day: "Fri", hours: 7.5 },
     { day: "Sat", hours: 8.5 },
     { day: "Sun", hours: 7.5 },
+  ];
+
+  const doctorRecommendations = [
+    {
+      id: 1,
+      doctorName: "Dr. Sharma",
+      date: "2024-11-20",
+      recommendation: "Increase water intake to 10 glasses per day. Stay hydrated, especially during physical activities.",
+      priority: "high",
+    },
+    {
+      id: 2,
+      doctorName: "Dr. Patel",
+      date: "2024-11-18",
+      recommendation: "Aim for 8 hours of sleep daily. Maintain a consistent sleep schedule for better recovery.",
+      priority: "medium",
+    },
+    {
+      id: 3,
+      doctorName: "Dr. Sharma",
+      date: "2024-11-15",
+      recommendation: "Add 30 minutes of light exercise daily. Walking or yoga would be beneficial for your health goals.",
+      priority: "medium",
+    },
   ];
 
   const handleLogout = () => {
@@ -199,6 +224,40 @@ const PatientDashboard = () => {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Doctor Recommendations */}
+        <div className="mt-8">
+          <h3 className="text-2xl font-bold mb-4">Doctor Recommendations</h3>
+          <div className="space-y-4">
+            {doctorRecommendations.map((rec) => (
+              <Card key={rec.id} className="border-0 shadow-md hover:shadow-lg transition-all">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <Stethoscope className="h-5 w-5 text-primary" />
+                      <div>
+                        <CardTitle className="text-lg">{rec.doctorName}</CardTitle>
+                        <CardDescription className="text-xs">
+                          {new Date(rec.date).toLocaleDateString("en-IN", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })}
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <Badge variant={rec.priority === "high" ? "default" : "secondary"}>
+                      {rec.priority === "high" ? "High Priority" : "Medium Priority"}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-foreground">{rec.recommendation}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       </main>
     </div>
