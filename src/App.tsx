@@ -5,6 +5,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import PatientLogin from "./pages/patient/PatientLogin";
+import PatientRegister from "./pages/patient/PatientRegister";
+import PatientDashboard from "./pages/patient/PatientDashboard";
+import PatientProfile from "./pages/patient/PatientProfile";
+import DoctorLogin from "./pages/doctor/DoctorLogin";
+import DoctorRegister from "./pages/doctor/DoctorRegister";
+import DoctorDashboard from "./pages/doctor/DoctorDashboard";
+import DoctorProfile from "./pages/doctor/DoctorProfile";
 
 const queryClient = new QueryClient();
 
@@ -16,6 +24,14 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/patient/login" element={<PatientLogin />} />
+          <Route path="/patient/register" element={<PatientRegister />} />
+          <Route path="/patient/dashboard" element={<PatientDashboard />} />
+          <Route path="/patient/profile" element={<PatientProfile />} />
+          <Route path="/doctor/login" element={<DoctorLogin />} />
+          <Route path="/doctor/register" element={<DoctorRegister />} />
+          <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
+          <Route path="/doctor/profile" element={<DoctorProfile />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
