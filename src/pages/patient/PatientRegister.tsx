@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Heart, Mail, Lock, User, Phone, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
@@ -154,6 +155,24 @@ const PatientRegister = () => {
                 >
                   {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
+              </div>
+            </div>
+            <div className="flex items-start space-x-3 pt-2">
+              <Checkbox
+                id="privacyConsent"
+                required // Makes the native browser validation hint visible, though we check in handleSubmit
+                className="mt-1"
+              />
+              <div className="grid gap-1.5 leading-none">
+                <Label
+                  htmlFor="privacyConsent"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  I consent to sharing my personal health data with my assigned healthcare providers.
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  This is required to receive personalized recommendations and care.
+                </p>
               </div>
             </div>
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
