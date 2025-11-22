@@ -147,8 +147,14 @@ const PatientDashboard = () => {
 
   const { todayStats, weeklyData, doctorRecommendations } = data;
 
-  // Destructure for easier access
-  const { waterIntake, waterGoal, calories, caloriesGoal, sleep, sleepGoal } = todayStats;
+  const { 
+    waterIntake = 0, 
+    waterGoal = 8, 
+    calories = 0, 
+    caloriesGoal = 2000, 
+    sleep = 0, 
+    sleepGoal = 8 
+  } = todayStats;
 
   const waterProgress = (waterIntake / waterGoal) * 100;
   const caloriesProgress = (calories / caloriesGoal) * 100;
