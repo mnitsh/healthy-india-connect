@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Heart, Droplets, Flame, Moon, User, LogOut, Stethoscope } from "lucide-react";
+import { Heart, Droplets, Flame, Moon, User, LogOut, Stethoscope, BriefcaseMedical, CheckCircle } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import DoctorList from "./DoctorList"; // Import the new component
 
 interface TodayStats {
   waterIntake: number;
@@ -37,10 +39,13 @@ interface DashboardData {
   doctorRecommendations: Recommendation[];
 }
 
+
 const PatientDashboard = () => {
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDoctorListOpen, setIsDoctorListOpen] = useState(false);
+  const [assignedDoctors, setAssignedDoctors] = useState<{ id: string; name: string }[]>([]);
 
   const userToken = localStorage.getItem('userToken');
 
@@ -52,41 +57,68 @@ const PatientDashboard = () => {
     navigate('/patient/login');
   }
 
-  // --- Data Fetching Effect ---
-  useEffect(() => {
-    if (!userToken) {
-        handleAuthError("Please log in to view your dashboard.");
-        return;
+  // Function to fetch assigned doctors' details
+  const fetchAssignedDoctors = async (token: string) => {
+    try {
+      const doctorsListResponse = await fetch('http://localhost:5000/api/doctors/list', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (!doctorsListResponse.ok) throw new Error('Failed to fetch doctor list');
+
+      const doctorsList = await doctorsListResponse.json();
+
+      const assigned = doctorsList
+        .filter((d: any) => d.isAssigned)
+        .map((d: any) => ({ id: d.id, name: d.name }));
+
+      setAssignedDoctors(assigned);
+    } catch (error) {
+      console.error("Assigned Doctors Fetch Error:", error);
     }
+  };
 
-    const fetchDashboardData = async () => {
-      try {
-        const response = await fetch('http://localhost:5000/api/dashboard/patient', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${userToken}`,
-          },
-        });
-        
-        if (response.status === 401 || response.status === 403) {
-            return handleAuthError(response.statusText);
-        }
 
-        const result = await response.json();
+  // Refetch data function
+  const fetchDashboardData = async () => {
+    if (!userToken) {
+      handleAuthError("Please log in to view your dashboard.");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/dashboard/patient', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${userToken}`,
+        },
+      });
 
-        if (response.ok) {
-          setData(result);
-        } else {
-          toast.error(result.message || "Failed to load dashboard data.");
-        }
-      } catch (error) {
-        console.error("Dashboard Fetch Error:", error);
-        toast.error("Network error fetching dashboard data.");
-      } finally {
-        setIsLoading(false);
+      if (response.status === 401 || response.status === 403) {
+        return handleAuthError(response.statusText);
       }
-    };
 
+      const result = await response.json();
+
+      if (response.ok) {
+        setData(result);
+      } else {
+        toast.error(result.message || "Failed to load dashboard data.");
+      }
+    } catch (error) {
+      console.error("Dashboard Fetch Error:", error);
+      toast.error("Network error fetching dashboard data.");
+    } finally {
+      // Run secondary fetch regardless of success status
+      if (userToken) {
+        await fetchAssignedDoctors(userToken);
+      }
+      setIsLoading(false);
+    }
+  };
+
+
+  useEffect(() => {
     fetchDashboardData();
   }, [userToken, navigate]);
 
@@ -95,29 +127,29 @@ const PatientDashboard = () => {
     localStorage.removeItem('userRole');
     navigate("/patient/login");
   };
-  
+
   if (isLoading) {
     return (
-        <div className="min-h-screen flex items-center justify-center">
-            <p className="text-xl text-muted-foreground">Loading dashboard...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-xl text-muted-foreground">Loading dashboard...</p>
+      </div>
     );
   }
 
   if (!data) {
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-4">
-            <p className="text-xl text-destructive mb-4">Could not load dashboard data.</p>
-            <Button onClick={handleLogout}>Go to Login</Button>
-        </div>
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <p className="text-xl text-destructive mb-4">Could not load dashboard data.</p>
+        <Button onClick={handleLogout}>Go to Login</Button>
+      </div>
     );
   }
 
   const { todayStats, weeklyData, doctorRecommendations } = data;
-  
+
   // Destructure for easier access
   const { waterIntake, waterGoal, calories, caloriesGoal, sleep, sleepGoal } = todayStats;
-  
+
   const waterProgress = (waterIntake / waterGoal) * 100;
   const caloriesProgress = (calories / caloriesGoal) * 100;
   const sleepProgress = (sleep / sleepGoal) * 100;
@@ -133,6 +165,7 @@ const PatientDashboard = () => {
             <h1 className="text-xl font-bold text-primary">Healthy India</h1>
           </div>
           <div className="flex items-center gap-4">
+            {/* Removed redundant Dialog/Book Doctor button from header */}
             <Button variant="ghost" size="sm" onClick={() => navigate("/patient/profile")}>
               <User className="h-4 w-4 mr-2" />
               Profile
@@ -278,40 +311,91 @@ const PatientDashboard = () => {
           </Card>
         </div>
 
-        {/* Doctor Recommendations (Dynamic) */}
+        {/* Doctor Recommendations (Dynamic) - MODIFIED SECTION */}
         <div className="mt-8">
           <h3 className="text-2xl font-bold mb-4">Doctor Recommendations</h3>
           <div className="space-y-4">
             {doctorRecommendations.length > 0 ? (
-                doctorRecommendations.map((rec, index) => (
-                    <Card key={index} className="border-0 shadow-md hover:shadow-lg transition-all">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            <Stethoscope className="h-5 w-5 text-primary" />
-                            <div>
-                              <CardTitle className="text-lg">{rec.doctorName}</CardTitle>
-                              <CardDescription className="text-xs">
-                                {new Date(rec.date).toLocaleDateString("en-IN", {
-                                  year: "numeric",
-                                  month: "long",
-                                  day: "numeric",
-                                })}
-                              </CardDescription>
-                            </div>
-                          </div>
-                          <Badge variant={rec.priority === "high" ? "default" : "secondary"}>
-                            {rec.priority === "high" ? "High Priority" : rec.priority === "medium" ? "Medium Priority" : "Low Priority"}
-                          </Badge>
+              doctorRecommendations.map((rec, index) => (
+                <Card key={index} className="border-0 shadow-md hover:shadow-lg transition-all">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <Stethoscope className="h-5 w-5 text-primary" />
+                        <div>
+                          <CardTitle className="text-lg">{rec.doctorName}</CardTitle>
+                          <CardDescription className="text-xs">
+                            {new Date(rec.date).toLocaleDateString("en-IN", {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            })}
+                          </CardDescription>
                         </div>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-foreground">{rec.recommendation}</p>
-                      </CardContent>
-                    </Card>
-                ))
+                      </div>
+                      <Badge variant={rec.priority === "high" ? "default" : "secondary"}>
+                        {rec.priority === "high" ? "High Priority" : rec.priority === "medium" ? "Medium Priority" : "Low Priority"}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-foreground">{rec.recommendation}</p>
+                  </CardContent>
+                </Card>
+              ))
             ) : (
-                <p className="text-muted-foreground">No recent recommendations from your doctor.</p>
+              <>
+                {assignedDoctors.length > 0 ? (
+                  // Case 1: Assigned, awaiting first recommendation
+                  <Card className="p-6 text-center shadow-lg border-success/50 border-2 bg-success/5">
+                    <CheckCircle className="h-8 w-8 text-success mx-auto mb-3" />
+                    <h4 className="font-semibold text-lg mb-2">
+                      Assigned to Dr. {assignedDoctors.map(d => d.name).join(', ')}!
+                    </h4>
+                    <p className="text-muted-foreground mb-4">
+                      Your data is now shared. Please allow your doctor some time to review your profile and post your first recommendation.
+                    </p>
+                    {/* Option to view/manage doctors */}
+                    <Dialog open={isDoctorListOpen} onOpenChange={setIsDoctorListOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="default">
+                          <BriefcaseMedical className="h-4 w-4 mr-2" />
+                          Manage Doctors
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                          <DialogTitle>Find a Doctor</DialogTitle>
+                          <CardDescription>Connect with a specialist to get expert recommendations.</CardDescription>
+                        </DialogHeader>
+                        <DoctorList onBookSuccess={() => { setIsDoctorListOpen(false); fetchDashboardData(); }} />
+                      </DialogContent>
+                    </Dialog>
+                  </Card>
+                ) : (
+                  // Case 2: Not assigned to any doctor (Initial state)
+                  <Card className="p-6 text-center shadow-lg border-primary/50 border-2">
+                    <BriefcaseMedical className="h-8 w-8 text-primary mx-auto mb-3" />
+                    <h4 className="font-semibold text-lg mb-4">No Doctor Assigned Yet</h4>
+                    <p className="text-muted-foreground mb-4">Book a doctor to receive personalized advice and care.</p>
+                    <Dialog open={isDoctorListOpen} onOpenChange={setIsDoctorListOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="default" className="w-full">
+                          <BriefcaseMedical className="h-4 w-4 mr-2" />
+                          Find & Book a Doctor
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                          <DialogTitle>Find a Doctor</DialogTitle>
+                          <CardDescription>Connect with a specialist to get expert recommendations.</CardDescription>
+                        </DialogHeader>
+                        <DoctorList onBookSuccess={() => { setIsDoctorListOpen(false); fetchDashboardData(); }} />
+                      </DialogContent>
+                    </Dialog>
+                  </Card>
+                )}
+              </>
             )}
           </div>
         </div>
