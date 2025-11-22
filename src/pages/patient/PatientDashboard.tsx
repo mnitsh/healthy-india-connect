@@ -9,9 +9,9 @@ import { Badge } from "@/components/ui/badge";
 
 const PatientDashboard = () => {
   const navigate = useNavigate();
-  const [waterIntake] = useState(6); // out of 8 glasses
-  const [calories] = useState(1850); // out of 2000
-  const [sleep] = useState(7.5); // hours
+  const [waterIntake] = useState(6);
+  const [calories] = useState(1850);
+  const [sleep] = useState(7.5);
 
   const weeklyWaterData = [
     { day: "Mon", glasses: 7 },

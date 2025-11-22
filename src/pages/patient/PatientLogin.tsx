@@ -1,25 +1,52 @@
+// mnitsh/healthy-india-connect/healthy-india-connect-055480aa7972ac978dcb4c33cd14010bf72a4ea2/src/pages/patient/PatientLogin.tsx
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Heart, Mail, Lock } from "lucide-react";
+import { Heart, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 const PatientLogin = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement actual authentication
-    if (email && password) {
-      toast.success("Login successful!");
-      navigate("/patient/dashboard");
-    } else {
+    if (!email || !password) {
       toast.error("Please fill in all fields");
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          role: 'patient', // Explicitly set role for portal validation
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        localStorage.setItem('userToken', data.token);
+        localStorage.setItem('userRole', data.role);
+        toast.success("Login successful!");
+        navigate("/patient/dashboard");
+      } else {
+        toast.error(data.message || "Login failed. Invalid credentials or user not found.");
+      }
+    } catch (error) {
+      console.error("Login Error:", error);
+      toast.error("Network error. Could not connect to the server.");
     }
   };
 
@@ -56,13 +83,20 @@ const PatientLogin = () => {
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
-                  className="pl-10"
+                  className="pl-10 pr-10"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
